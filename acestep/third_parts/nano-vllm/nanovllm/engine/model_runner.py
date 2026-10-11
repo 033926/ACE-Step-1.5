@@ -106,6 +106,27 @@ def find_available_port(start_port: int = 2333, max_attempts: int = 100) -> int:
     raise RuntimeError(f"Could not find an available port starting from {start_port} after {max_attempts} attempts")
 
 
+def update_processor_states(seqs: list[Sequence], token_ids: list[int]) -> None:
+    """Advance each logits processor's state once per step, with the token of its first sequence.
+
+    All items of one request share a single SamplingParams, hence a single processor, and advance in
+    lockstep: updating it once per item would count each step N times (codes_count += N instead of += 1),
+    so only the first of them drives it. Requests merged into one generate() call each bring their own
+    processor (own target length, own metadata); every one of those must be advanced, not just the
+    batch's first. With a single request this is exactly the old "seqs[0] only" behaviour.
+    """
+    seen = set()
+    for seq, token_id in zip(seqs, token_ids):
+        update = seq.logits_processor_update_state
+        if update is None:
+            continue
+        owner = id(getattr(update, "__self__", update))
+        if owner in seen:
+            continue
+        seen.add(owner)
+        update(token_id)
+
+
 class ModelRunner:
 
     def __init__(self, config: Config, rank: int, event: Event | list[Event]):
@@ -626,11 +647,9 @@ class ModelRunner:
                     # input_ids=cond_input_ids,
                 ).tolist()
                 
-                # Update logits processor state after sampling
-                # NOTE: Only update for the first sequence since all sequences share the same processor
-                # Updating multiple times would cause duplicate state updates (e.g., codes_count += N instead of += 1)
-                if cond_seqs and cond_seqs[0].logits_processor_update_state is not None:
-                    cond_seqs[0].logits_processor_update_state(token_ids_cfg[0])
+                # Update logits processor state after sampling: once per processor (see
+                # update_processor_states), so requests merged into one batch each advance their own.
+                update_processor_states(cond_seqs, token_ids_cfg)
                 
                 # Return token_ids (will be applied to both conditional and unconditional sequences)
                 return token_ids_cfg
@@ -694,12 +713,8 @@ class ModelRunner:
                     # input_ids=seq_input_ids,
                 ).tolist()
                 
-                # Update logits processor state after sampling
-                # NOTE: Only update for the first sequence since all sequences may share the same processor
-                # (when using a single SamplingParams for batch generation)
-                # Updating multiple times would cause duplicate state updates (e.g., codes_count += N instead of += 1)
-                if seqs and seqs[0].logits_processor_update_state is not None:
-                    seqs[0].logits_processor_update_state(token_ids[0])
+                # Update logits processor state after sampling: once per processor (see update_processor_states)
+                update_processor_states(seqs, token_ids)
                 
                 return token_ids
             else:
