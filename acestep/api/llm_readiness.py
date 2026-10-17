@@ -57,7 +57,18 @@ def ensure_llm_ready_for_request(
             return
 
         project_root = get_project_root()
-        checkpoint_dir = os.path.join(project_root, "checkpoints")
+        # Same resolver the DiT loader and the init service use: the lazy path
+        # must not fall back to <project_root>/checkpoints when
+        # ACESTEP_CHECKPOINTS_DIR points at the product's model tree. Without
+        # this, a job that triggers the LM load looks in the engine's own tree
+        # and fails even though the weights are present. BATOG fork addition.
+        env_ckpt = os.environ.get("ACESTEP_CHECKPOINTS_DIR")
+        if env_ckpt:
+            from acestep.model_downloader import get_checkpoints_dir
+
+            checkpoint_dir = str(get_checkpoints_dir())
+        else:
+            checkpoint_dir = os.path.join(project_root, "checkpoints")
         lm_model_path = (
             req.lm_model_path or os.getenv("ACESTEP_LM_MODEL_PATH") or "acestep-5Hz-lm-0.6B"
         ).strip()
