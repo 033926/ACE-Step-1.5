@@ -91,7 +91,17 @@ def initialize_models_for_request(
 
     llm = app_state.llm_handler
     project_root = get_project_root()
-    checkpoint_dir = os.path.join(project_root, "checkpoints")
+    # The LLM tree must resolve through the same ACESTEP_CHECKPOINTS_DIR the DiT
+    # loader uses (init_service_orchestrator honours it; falling back to the
+    # project-root default here made every LM init look in the wrong tree when
+    # ACESTEP_CHECKPOINTS_DIR pointed elsewhere). BATOG fork addition.
+    from acestep.model_downloader import get_checkpoints_dir
+
+    env_ckpt = os.environ.get("ACESTEP_CHECKPOINTS_DIR")
+    if env_ckpt:
+        checkpoint_dir = str(get_checkpoints_dir())
+    else:
+        checkpoint_dir = os.path.join(project_root, "checkpoints")
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     target_model = (model_name or get_model_name(current_config)).strip()
