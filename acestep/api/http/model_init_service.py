@@ -57,6 +57,7 @@ def initialize_models_for_request(
     model_name: Optional[str],
     init_llm: bool,
     requested_lm_model_path: Optional[str],
+    quantization: Optional[str],
     get_project_root: Callable[[], str],
     get_model_name: Callable[[str], str],
     ensure_model_downloaded: Callable[[str, str], str],
@@ -117,6 +118,7 @@ def initialize_models_for_request(
         compile_model=compile_model,
         offload_to_cpu=offload_to_cpu,
         offload_dit_to_cpu=offload_dit_to_cpu,
+        quantization=quantization,
     )
     if not ok:
         setattr(app_state, error_attr, status_msg)

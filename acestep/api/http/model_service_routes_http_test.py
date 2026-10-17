@@ -202,6 +202,49 @@ class ModelServiceRoutesHttpTests(unittest.TestCase):
         call_kwargs = mock_init.call_args.kwargs
         self.assertEqual(2, call_kwargs["slot"])
 
+    def test_init_route_passes_quantization_to_initializer(self):
+        """POST /v1/init with quantization should forward it (BATOG fork addition).
+
+        Upstream `/v1/init` has no quantization field at all, so this asserts the
+        fork's whole reason for existing: the request body reaches the loader.
+        """
+
+        client = self._build_client()
+        with mock.patch(
+            "acestep.api.http.model_service_routes.initialize_models_for_request",
+            return_value={"loaded_model": "acestep-v15-xl-base", "loaded_lm_model": None},
+        ) as mock_init:
+            response = client.post(
+                "/v1/init",
+                headers={"Authorization": "Bearer test-token"},
+                json={
+                    "model": "acestep-v15-xl-base",
+                    "init_llm": False,
+                    "quantization": "int8_weight_only",
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        call_kwargs = mock_init.call_args.kwargs
+        self.assertEqual("int8_weight_only", call_kwargs["quantization"])
+
+    def test_init_route_defaults_quantization_to_none(self):
+        """Omitting quantization must stay a no-op, not a silent default."""
+
+        client = self._build_client()
+        with mock.patch(
+            "acestep.api.http.model_service_routes.initialize_models_for_request",
+            return_value={"loaded_model": "acestep-v15-base", "loaded_lm_model": None},
+        ) as mock_init:
+            response = client.post(
+                "/v1/init",
+                headers={"Authorization": "Bearer test-token"},
+                json={"model": "acestep-v15-base", "init_llm": False},
+            )
+
+        self.assertEqual(200, response.status_code)
+        self.assertIsNone(mock_init.call_args.kwargs["quantization"])
+
     def test_init_route_returns_400_for_unavailable_slot(self):
         """POST /v1/init for a disabled slot should return code=400."""
 

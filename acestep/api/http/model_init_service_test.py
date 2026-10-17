@@ -49,6 +49,8 @@ class ModelInitServiceTests(unittest.TestCase):
                     model_name="acestep-v15-base",
                     init_llm=False,
                     requested_lm_model_path=None,
+                    quantization=None,
+
                     get_project_root=lambda: "/tmp/non-existent",
                     get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                     ensure_model_downloaded=lambda *_: "",
@@ -67,6 +69,8 @@ class ModelInitServiceTests(unittest.TestCase):
                     model_name="acestep-v15-base",
                     init_llm=True,
                     requested_lm_model_path="acestep-5Hz-lm-0.6B",
+                    quantization=None,
+
                     get_project_root=lambda: "/tmp/non-existent",
                     get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                     ensure_model_downloaded=lambda *_: "",
@@ -89,6 +93,8 @@ class ModelInitServiceTests(unittest.TestCase):
                 model_name="acestep-v15-base",
                 init_llm=False,
                 requested_lm_model_path=None,
+                quantization=None,
+
                 get_project_root=lambda: "/tmp/non-existent",
                 get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                 ensure_model_downloaded=lambda *_: "",
@@ -118,6 +124,8 @@ class ModelInitServiceTests(unittest.TestCase):
                     model_name="acestep-v15-base",
                     init_llm=True,
                     requested_lm_model_path="acestep-5Hz-lm-0.6B",
+                    quantization=None,
+
                     get_project_root=lambda: "/tmp/non-existent",
                     get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                     ensure_model_downloaded=lambda *_: "",
@@ -144,6 +152,8 @@ class ModelInitServiceTests(unittest.TestCase):
                 model_name="acestep-v15-base",
                 init_llm=False,
                 requested_lm_model_path=None,
+                quantization=None,
+
                 get_project_root=lambda: "/tmp/non-existent",
                 get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                 ensure_model_downloaded=lambda *_: "",
@@ -176,6 +186,8 @@ class ModelInitServiceTests(unittest.TestCase):
                 model_name="acestep-v15-base",
                 init_llm=False,
                 requested_lm_model_path=None,
+                quantization=None,
+
                 get_project_root=lambda: "/tmp/non-existent",
                 get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                 ensure_model_downloaded=lambda *_: "",
@@ -208,6 +220,8 @@ class ModelInitServiceTests(unittest.TestCase):
                 model_name="acestep-v15-base",
                 init_llm=False,
                 requested_lm_model_path=None,
+                quantization=None,
+
                 get_project_root=lambda: "/tmp/non-existent",
                 get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                 ensure_model_downloaded=lambda *_: "",
@@ -237,6 +251,8 @@ class ModelInitServiceTests(unittest.TestCase):
                     model_name="acestep-v15-base",
                     init_llm=False,
                     requested_lm_model_path=None,
+                    quantization=None,
+
                     get_project_root=lambda: "/tmp/non-existent",
                     get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                     ensure_model_downloaded=lambda *_: "",
@@ -263,6 +279,8 @@ class ModelInitServiceTests(unittest.TestCase):
                     model_name="acestep-v15-base",
                     init_llm=False,
                     requested_lm_model_path=None,
+                    quantization=None,
+
                     get_project_root=lambda: "/tmp/non-existent",
                     get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                     ensure_model_downloaded=lambda *_: "",
@@ -271,6 +289,39 @@ class ModelInitServiceTests(unittest.TestCase):
                 )
         self.assertIn("Slot 3", str(ctx.exception))
         self.assertIn("ACESTEP_CONFIG_PATH3", str(ctx.exception))
+
+    def test_quantization_reaches_initialize_service(self):
+        """The requested quantization must arrive at the DiT loader unchanged.
+
+        This is the contract the BATOG fork restores: without it the loader always
+        received ``None`` and every API-served model loaded in full bf16.
+        """
+
+        handler = mock.Mock()
+        handler.initialize_service.return_value = ("ok", True)
+        state = SimpleNamespace(
+            handler=handler,
+            llm_handler=_FakeLlm(),
+            _llm_init_lock=threading.Lock(),
+            _config_path="",
+        )
+        with mock.patch("acestep.api.http.model_init_service.os.makedirs"):
+            initialize_models_for_request(
+                app_state=state,
+                model_name="acestep-v15-xl-base",
+                init_llm=False,
+                requested_lm_model_path=None,
+                quantization="int8_weight_only",
+                get_project_root=lambda: "/tmp/non-existent",
+                get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
+                ensure_model_downloaded=lambda *_: "",
+                env_bool=lambda *_: False,
+            )
+
+        self.assertEqual(
+            "int8_weight_only",
+            handler.initialize_service.call_args.kwargs["quantization"],
+        )
 
     def test_init_llm_uses_pt_backend_for_legacy_cuda_gpu(self):
         """Legacy CUDA GPU configs should coerce LM init away from vllm."""
@@ -303,6 +354,8 @@ class ModelInitServiceTests(unittest.TestCase):
                 model_name="acestep-v15-base",
                 init_llm=True,
                 requested_lm_model_path="acestep-5Hz-lm-0.6B",
+                quantization=None,
+
                 get_project_root=lambda: "/tmp/non-existent",
                 get_model_name=lambda p: str(p).split("/")[-1].split("\\")[-1],
                 ensure_model_downloaded=lambda *_: "",

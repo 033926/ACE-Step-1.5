@@ -28,6 +28,14 @@ class InitModelRequest(BaseModel):
     )
     init_llm: bool = Field(default=False, description="Whether to initialize LLM as part of this request")
     lm_model_path: Optional[str] = Field(default=None, description="LLM model path/name (e.g., 'acestep-5Hz-lm-1.7B')")
+    quantization: Optional[str] = Field(
+        default=None,
+        description=(
+            "DiT quantization method for this (re)load: int8_weight_only, "
+            "fp8_weight_only, w8a8_dynamic, or none (default: disabled). "
+            "BATOG fork addition — upstream API omits this field."
+        ),
+    )
 
 
 def _read_model_supported_tasks(checkpoint_dir: str, model_name: str) -> List[str]:
@@ -204,6 +212,7 @@ def register_model_service_routes(
                         slot=request.slot,
                         init_llm=request.init_llm,
                         requested_lm_model_path=request.lm_model_path,
+                        quantization=request.quantization,
                         get_project_root=get_project_root,
                         get_model_name=get_model_name,
                         ensure_model_downloaded=ensure_model_downloaded,
